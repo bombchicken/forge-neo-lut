@@ -1,0 +1,188 @@
+# Forge Neo LUT Color Grading v0.2.0
+
+Automatic color grading after generation, plus an upload-based preview tab to
+try different LUTs without generating again. Built for
+[Haoming02/sd-webui-forge-classic, neo branch](https://github.com/Haoming02/sd-webui-forge-classic/tree/neo).
+
+## Install
+
+In Forge Neo, open **Extensions → Install from URL**, enter
+`https://github.com/bombchicken/forge-neo-lut`, and install. Restart Forge fully,
+then copy your `.cube` files into `extensions/forge-neo-lut/luts/`.
+
+Alternatively, clone from your Forge installation directory:
+
+```sh
+git clone https://github.com/bombchicken/forge-neo-lut.git extensions/forge-neo-lut
+```
+
+For a ZIP installation:
+
+1. Stop Forge Neo.
+2. Extract the ZIP into your Forge installation's `extensions` directory.
+   The resulting layout must be:
+
+   ```text
+   extensions/
+     forge-neo-lut/
+       scripts/forge_lut.py
+       forge_neo_lut/engine.py
+       luts/
+       README.md
+   ```
+
+3. Copy your `.cube` files into `extensions/forge-neo-lut/luts/`.
+4. Start Forge Neo again. There are no extra runtime packages to install:
+   the extension uses Forge's existing NumPy, Pillow and Gradio.
+
+Do not put the entire ZIP inside `extensions`, and avoid a doubled
+`forge-neo-lut/forge-neo-lut` folder. To uninstall, stop Forge and remove this
+extension directory. Back up your LUTs first.
+
+### Upgrade from v0.1.0
+
+Stop Forge and extract v0.2.0 over your existing `extensions/forge-neo-lut/`
+folder, replacing code files. Keep your `luts/` folder and, on future upgrades,
+the new `data/` folder. Restart Forge fully; a UI refresh alone is insufficient.
+Do not install the two versions as separate extension folders.
+
+## Automatic grading
+
+In txt2img or img2img, expand **LUT Color Grading**, enable grading, choose a
+LUT, and set strength (0 = unchanged, 1 = full effect). Generate as usual.
+The finished image is graded after inpainting compositing and before Forge
+saves and displays it. Batch images are processed individually. Other
+extensions' ordering may affect the final result.
+
+**Save an ungraded original too** is enabled by default. It writes an additional
+lossless PNG file with an `-ungraded-` suffix into your usual sample output
+directory, using your folder settings. Your graded image still uses your chosen
+output format. It follows Forge's sample-saving
+settings: if sample saving is disabled, originals are not written. At strength
+zero the extension is bypassed, so there is no duplicate original.
+
+Graded-image generation parameters include `LUT enabled`, `LUT file`,
+`LUT SHA256`, `LUT strength` and an opaque `LUT source` ID. Enable Forge's image metadata saving to retain
+these in saved images. Hashes identify exact LUT contents; renaming alone does
+not change a hash. Original copies omit this extension's LUT parameters.
+
+## Extras: upscale first, apply the LUT once
+
+For **new images generated with v0.2.0**, keep **Save an ungraded original too**
+enabled, along with Forge's sample saving. Select the graded result and use
+**Send to Extras** as usual. Leave **Upscale ungraded original, then reapply its
+LUT** enabled in Extras (it defaults on). Choose your upscaler and run Extras.
+
+The extension looks up and verifies the lossless original and the recorded LUT
+contents, then runs all Extras operations on the ungraded pixels. Only after
+Extras finishes does it apply the original LUT and strength, once. This includes
+the upscaler's color-correction preparation and any other Extras operations,
+regardless of their processing order. Disabling the Extras checkbox restores
+Forge's ordinary behavior: it processes the pixels supplied to Extras.
+
+Repeated Extras runs on a linked upscaled output start from that output's own
+upscaled **ungraded** source. They do not drop back to base resolution or build
+up multiple LUT applications. Each secondary output receives its own source link.
+
+The new `data/` folder contains local source manifests and pixel-fingerprint
+indexes. Subsequent ungraded Extras results are stored as lossless PNGs in
+`data/originals/`. Keep this folder, the saved generation originals, and the LUTs
+in place while you want to use their links. These originals consume disk space
+and are not automatically removed. Uploaded metadata contains opaque IDs, not
+paths to open; only locally recorded originals are used.
+
+Missing or modified originals, missing or changed LUTs, ambiguous source matches,
+and recognized graded images without a link are **skipped with a visible warning
+before upscaling**. The output is not saved for that image. An exact pixel
+fingerprint can identify a linked image if Gradio drops metadata, including RGB
+to RGBA conversion and indexed saved JPEG pixels. Arbitrarily editing or
+recompressing an image can invalidate its link; use the original saved graded
+file. A completely metadata-stripped, altered file may be indistinguishable from
+an unrelated image and will be treated as ordinary input.
+
+Images generated by **v0.1.0** lack durable links and cannot automatically recover
+their originals. For those, load the saved `-ungraded-` original into Extras,
+upscale it, and apply the LUT to the result using LUT Preview. New automatic
+grading jobs with original saving disabled also cannot use original-first Extras.
+
+## Preview without generation
+
+1. Open **LUT Preview** and upload an **ungraded original** from disk. For new
+   generations, use the saved `-ungraded-` file. There is no gallery shortcut.
+2. Select a LUT and strength, then click **Update preview**.
+3. Compare the original and graded images side by side. Change settings and
+   click **Update preview** again. Every update rereads the uploaded original;
+   grades never accumulate unless you upload an already-graded image.
+4. Click **Save graded PNG copy**, then download the file from the download
+   control. Changing the source or grading settings clears the previous result
+   and download until you update again.
+
+Your uploaded file is never overwritten. The preview export preserves PNG text
+metadata (including Forge generation parameters), ICC profile and EXIF where
+present, and records the new grading in a separate `Forge LUT` JSON text field.
+Existing generation parameters describe the source; no new generation happened.
+For reliable generation metadata retention, use PNG sources: metadata stored
+only in JPEG/WebP EXIF UserComment is retained as EXIF, not translated to Forge's
+PNG `parameters` text field. Preview applies EXIF orientation before grading.
+PNG export preserves alpha. Preview downloads are temporary files available
+until Forge exits; save the download somewhere permanent. Clicking Save multiple
+times creates separate temporary copies.
+
+## Supported LUTs and color
+
+- Pure **3D `.cube`** LUTs, sizes 2 through 128, maximum file size 64 MiB.
+- Red-fastest data ordering, `TITLE`, `DOMAIN_MIN`, `DOMAIN_MAX`, comments,
+  blank lines, and UTF-8/BOM files.
+- Trilinear interpolation, clipping outside the input domain and final RGB range.
+- No 1D or combined 1D/3D LUTs, extended vendor directives, automatic camera Log
+  conversion, linear-light conversion or HDR/16-bit processing.
+- LUTs operate on ordinary encoded RGB values. Use creative LUTs intended for
+  your image's color space, normally sRGB. Embedded profiles are preserved;
+  no ICC profile conversion is performed.
+
+Click **Refresh LUTs** after adding files. Files are reloaded at the start of
+each job or preview; content hashes prevent stale LUT cache results. An active
+generation keeps its selected LUT contents for the entire job.
+
+Try a newly added LUT in Preview before spending compute on a generation.
+If a LUT is invalid or missing during automatic processing, the extension shows
+a warning and logs an error; Forge's script runner may continue generation with
+grading disabled. It does not promise to cancel the generation.
+
+## Verification
+
+Local automated tests cover LUT interpolation, ordering, domain ranges,
+strength, alpha, invalid files, cache invalidation, metadata round-trips,
+request isolation, original-saving arguments, repeat previews, Extras ordering,
+repeat upscales, source integrity, persistent/fingerprint matching, save callbacks,
+secondary outputs, and Gradio 4.40.0 UI construction. Forge host boundaries are stubbed; no model or live Forge
+generation was run in the build environment.
+
+For development in a separate environment:
+
+```powershell
+python -m pip install numpy pillow gradio==4.40.0 "huggingface_hub<1"
+python -m unittest discover -s tests -v
+```
+
+### First-install smoke check
+
+1. Confirm Forge starts without an extension import error and both grading
+   controls and the LUT Preview tab appear.
+2. Upload an existing PNG and compare several LUTs and strengths. Download a
+   copy and confirm metadata and transparency where applicable.
+3. Run a small txt2img batch with originals enabled. Confirm each image has a
+   graded and ungraded file with matching seeds, and graded files record LUT
+   name/hash/strength.
+4. Check img2img/inpainting on a small image: grading should affect the final
+   composited image, including areas outside the inpainted region.
+5. Disable grading and confirm normal behavior. Check with your usual other
+   postprocessing extensions enabled to establish your preferred ordering.
+6. Generate a new small image with originals enabled, send its graded result to
+   Extras, and upscale it. Compare with manually upscaling the original and then
+   applying the same LUT. Confirm the Extras result records `LUT applied after
+   Extras: True` and the correct LUT name/hash/strength.
+7. Send that upscaled result through Extras again: resolution should increase
+   again while its grade remains stable. Temporarily move its LUT or original
+   aside and confirm Extras skips with a warning before processing.
+
