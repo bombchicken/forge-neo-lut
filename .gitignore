@@ -7,7 +7,9 @@ venv/
 data/
 luts/*
 !luts/README.txt
+*.[cC][uU][bB][eE]
 *.png
 *.jpg
 *.jpeg
 *.webp
+
