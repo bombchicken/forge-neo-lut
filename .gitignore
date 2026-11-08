@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.ruff_cache/
+.pytest_cache/
+.venv/
+venv/
+data/
+luts/*
+!luts/README.txt
+*.png
+*.jpg
+*.jpeg
+*.webp

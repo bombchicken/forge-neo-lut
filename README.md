@@ -185,4 +185,3 @@ python -m unittest discover -s tests -v
 7. Send that upscaled result through Extras again: resolution should increase
    again while its grade remains stable. Temporarily move its LUT or original
    aside and confirm Extras skips with a warning before processing.
-
